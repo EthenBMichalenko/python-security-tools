@@ -91,6 +91,15 @@ def hash_password(password):
     suffix = finalhashed[5:]
     return prefix, suffix
 
+def check_pwned(prefix, suffix):
+    response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}")
+    response = response.text.split()
+    for line in response:
+        hash_suffix, count = line.split(":") 
+        if hash_suffix == suffix:
+            return int(count)
+    return 0
+
 def main():
     SCRIPT_DIR = Path(__file__).parent
     bad_passwords = load_common_passwords(SCRIPT_DIR / "common_passwords.txt")
@@ -120,8 +129,14 @@ def main():
         prefix, suffix = hash_password(password)
         print(f"Hash Prefix: {prefix}\nHash Suffix: {suffix}")
 
-    response = requests.get("https://api.pwnedpasswords.com/range/5BAA6")
-    print(response)
+        pwned_check = check_pwned(prefix, suffix)
+
+        if pwned_check == 0:
+            print("Your password was not seen in checked data breaches")
+        elif pwned_check == 1:
+            print(f"Your password was seen {pwned_check} time in a data breache")
+        else:
+            print(f"Your password was seen {pwned_check:,} times in data breaches")
 
 if __name__ == "__main__":
     main()
