@@ -1,4 +1,6 @@
 import string
+import hashlib
+import requests
 from pathlib import Path
 
 def check_password(password):
@@ -7,33 +9,31 @@ def check_password(password):
 
     if len(password) >= 8:
         score += 1
-    else: 
+    else:
         feedback.append("Use at least 8 characters")
 
     if any(char.isupper() for char in password):
         score += 1
-    else: 
+    else:
         feedback.append("Add an uppercase letter")
 
-    if  any(char.islower() for char in password):
+    if any(char.islower() for char in password):
         score += 1
-    else: 
+    else:
         feedback.append("Add a lowercase letter")
 
     if any(char.isdigit() for char in password):
         score += 1
-    else: 
+    else:
         feedback.append("Add a digit")
 
-    if any (char in string.punctuation for char in password):
+    if any(char in string.punctuation for char in password):
         score += 1
-    else: 
+    else:
         feedback.append("Add a special character")
-
-
     return score, feedback
 
-def load_common_password(filename):
+def load_common_passwords(filename):
     with open(filename) as file:
         bad_passwords = set()
         for line in file:
@@ -42,8 +42,8 @@ def load_common_password(filename):
     return bad_passwords
 
 def estimate_crack_time(password):
-    MINIUTE = 60
-    HOUR = 60 * MINIUTE
+    MINUTE = 60
+    HOUR = 60 * MINUTE
     DAY = 24 * HOUR
     YEAR = 365 * DAY
     LOWERCASE = 26
@@ -63,45 +63,65 @@ def estimate_crack_time(password):
     if any(char.isdigit() for char in password):
         pool += DIGIT
     
-    if any (char in string.punctuation for char in password):
+    if any(char in string.punctuation for char in password):
         pool += SPECIAL
 
     combination = pool ** len(password)
-
     seconds = combination / GUESSES_PER_SECOND
 
-    if seconds <= MINIUTE:
-        return f"Time to crack: {seconds} seconds"
+    if seconds < 1:
+        return "Time to crack: Less than a second"
+    elif seconds <= MINUTE:
+        return f"Time to crack: {seconds:.1f} seconds"
     elif seconds <= HOUR:
-        return f"Time to crack: {seconds / MINIUTE:.1f} minutes" 
+        return f"Time to crack: {seconds / MINUTE:.1f} minutes" 
     elif seconds <= DAY:
         return f"Time to crack: {seconds / HOUR:.1f} hours"
     elif seconds <= YEAR:
         return f"Time to crack: {seconds / DAY:.1f} days"
     else:
         return f"Time to crack: {seconds / YEAR:.1f} years" 
+    
+def hash_password(password):
+    password_bytes = password.encode()
+    hashed = hashlib.sha1()
+    hashed.update(password_bytes)
+    finalhashed = hashed.hexdigest().upper()
+    prefix = finalhashed[:5]
+    suffix = finalhashed[5:]
+    return prefix, suffix
 
-SCRIPT_DIR = Path(__file__).parent
-bad_passwords = load_common_password(SCRIPT_DIR / "common_passwords.txt")
+def main():
+    SCRIPT_DIR = Path(__file__).parent
+    bad_passwords = load_common_passwords(SCRIPT_DIR / "common_passwords.txt")
 
-password = input("Enter a password to check: ")
-score, feedback = check_password(password)
+    password = input("Enter a password to check: ")
+    score, feedback = check_password(password)
 
-if score < 3:
-    label = "Weak"
-elif score < 5:
-    label = "Medium"
-else: 
-    label = "Strong"
+    if score < 3:
+        label = "Weak"
+    elif score < 5:
+        label = "Medium"
+    else:
+        label = "Strong"
 
-if password.lower() in bad_passwords:
-    label = "Weak"
-    score = 0
-    print("⚠️ This password is in a list of commonly leaked passwords!")
+    if len(password) == 0:
+        print("Please enter a password")
+    else:
+        if password.lower() in bad_passwords:
+            label = "Weak"
+            score = 0
+            print("This password is in a list of commonly leaked passwords!")
+        
+        print(f"Score: {score} / 5 ({label})")
+        print(estimate_crack_time(password))
+        for word in feedback:
+            print("-", word)
+        prefix, suffix = hash_password(password)
+        print(f"Hash Prefix: {prefix}\nHash Suffix: {suffix}")
 
+    response = requests.get("https://api.pwnedpasswords.com/range/5BAA6")
+    print(response)
 
-
-print(f"Score: {score} / 5 ({label})")
-print(estimate_crack_time(password))
-for word in feedback:
-    print("-", word)
+if __name__ == "__main__":
+    main()
