@@ -92,7 +92,11 @@ def hash_password(password):
     return prefix, suffix
 
 def check_pwned(prefix, suffix):
-    response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}")
+    try:
+        response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=5)
+        response.raise_for_status()
+    except requests.exceptions.RequestException:
+        return None
     response = response.text.split()
     for line in response:
         hash_suffix, count = line.split(":") 
@@ -134,7 +138,9 @@ def main():
         if pwned_check == 0:
             print("Your password was not seen in checked data breaches")
         elif pwned_check == 1:
-            print(f"Your password was seen {pwned_check} time in a data breache")
+            print(f"Your password was seen {pwned_check} time in a data breach")
+        elif pwned_check is None:
+            print("Your password was not able to be checked because of an error")
         else:
             print(f"Your password was seen {pwned_check:,} times in data breaches")
 
