@@ -109,6 +109,10 @@ def main():
     bad_passwords = load_common_passwords(SCRIPT_DIR / "common_passwords.txt")
 
     password = input("Enter a password to check: ")
+    if len(password) == 0:
+        print("Please enter a password")
+        return
+
     score, feedback = check_password(password)
 
     if score < 3:
@@ -118,31 +122,33 @@ def main():
     else:
         label = "Strong"
 
-    if len(password) == 0:
-        print("Please enter a password")
+    if password.lower() in bad_passwords:
+        label = "Weak"
+        score = 0
+        print("This password is in a list of commonly leaked passwords!")
+
+    prefix, suffix = hash_password(password)
+    pwned_check = check_pwned(prefix, suffix)
+
+    if pwned_check is None:
+        pwned_label = "Your password was not able to be checked because of an error"
+    elif pwned_check == 0:
+        pwned_label = "Your password was not seen in checked data breaches"
     else:
-        if password.lower() in bad_passwords:
-            label = "Weak"
-            score = 0
-            print("This password is in a list of commonly leaked passwords!")
-        
-        print(f"Score: {score} / 5 ({label})")
-        print(estimate_crack_time(password))
-        for word in feedback:
-            print("-", word)
-        prefix, suffix = hash_password(password)
-        print(f"Hash Prefix: {prefix}\nHash Suffix: {suffix}")
-
-        pwned_check = check_pwned(prefix, suffix)
-
-        if pwned_check == 0:
-            print("Your password was not seen in checked data breaches")
-        elif pwned_check == 1:
-            print(f"Your password was seen {pwned_check} time in a data breach")
-        elif pwned_check is None:
-            print("Your password was not able to be checked because of an error")
+        label = "Weak"
+        score = 0
+        if pwned_check == 1:
+            pwned_label = "Your password was seen 1 time in a data breach"
         else:
-            print(f"Your password was seen {pwned_check:,} times in data breaches")
+            pwned_label = f"Your password was seen {pwned_check:,} times in data breaches"
+
+    print(f"Score: {score} / 5 ({label})")
+    print(estimate_crack_time(password))
+    for word in feedback:
+        print("-", word)
+    print(f"Hash Prefix: {prefix}\nHash Suffix: {suffix}")
+    print(pwned_label)
+
 
 if __name__ == "__main__":
     main()
